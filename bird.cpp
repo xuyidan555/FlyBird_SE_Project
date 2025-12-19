@@ -1,13 +1,19 @@
 #include "bird.h"
 #include <QGraphicsScene>
-Bird::Bird() : velocity(0), gravity(0.5), lift(-10) {
-	setPixmap(QPixmap(":/assets/images/bluebird-midflap.png").scaled(40, 40));
+#include <QPainter>
+#include <QPainterPath>
+
+Bird::Bird() : velocity(0), gravity(0.5), lift(-10), customSkin(false) {
+	defaultUp = QPixmap(":/assets/images/bluebird-upflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	defaultMid = QPixmap(":/assets/images/bluebird-midflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	defaultDown = QPixmap(":/assets/images/bluebird-downflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	useDefaultSkin();
 	setPos(100, 300);
 }
 
 void Bird::flap() {
 	velocity = lift;
-	setPixmap(QPixmap(":/assets/images/bluebird-upflap.png").scaled(40, 40));
+	setPixmap(customSkin ? skinMid : skinUp);
 }
 
 void Bird::updatePosition() {
@@ -24,11 +30,37 @@ void Bird::updatePosition() {
 		velocity = 0;
 	}
 
-	setPixmap(QPixmap(":/assets/images/bluebird-downflap.png").scaled(40, 40));
+	setPixmap(customSkin ? skinMid : skinDown);
 }
 
 void Bird::reset()
 {
-	setPixmap(QPixmap(":/assets/images/bluebird-midflap.png").scaled(40, 40));
+	setPixmap(skinMid);
 	setPos(100, 300);
+}
+
+void Bird::setSkin(const QPixmap& pix)
+{
+	QPixmap scaled = pix.scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	QPixmap rounded(scaled.size());
+	rounded.fill(Qt::transparent);
+	QPainter painter(&rounded);
+	painter.setRenderHint(QPainter::Antialiasing);
+	QPainterPath path;
+	path.addEllipse(rounded.rect());
+	painter.setClipPath(path);
+	painter.drawPixmap(0, 0, scaled);
+	painter.end();
+	skinUp = skinMid = skinDown = rounded;
+	customSkin = true;
+	setPixmap(skinMid);
+}
+
+void Bird::useDefaultSkin()
+{
+	skinUp = defaultUp;
+	skinMid = defaultMid;
+	skinDown = defaultDown;
+	customSkin = false;
+	setPixmap(skinMid);
 }

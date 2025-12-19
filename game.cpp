@@ -10,8 +10,8 @@
 namespace {
 constexpr int kViewWidth = 400;
 constexpr int kViewHeight = 600;
-constexpr int kBirdSelectorY = 470;
-constexpr int kBirdSelectorStartX = 80;
+constexpr int kBirdSelectorY = 430;
+constexpr int kBirdSelectorStartX = 90;
 constexpr int kBirdSelectorSpacing = 90;
 }
 
@@ -21,13 +21,14 @@ Game::Game(QWidget* parent)
 	  restartHint(nullptr),
 	  selectedSkinIndex(0),
 	  score(0),
-	isGameOver(false),
-	startScreenVisible(false),
+	  isGameOver(false),
+	  startScreenVisible(false),
 	  startBg(nullptr),
 	  startGetReady(nullptr),
 	  startGuide(nullptr),
 	  startGoButton(nullptr),
-	  customSkinButton(nullptr) {
+	  customSkinButton(nullptr),
+	  customSkinIndex(-1) {
 	scene = new QGraphicsScene(this);
 	setScene(scene);
 
@@ -89,6 +90,7 @@ void Game::keyPressEvent(QKeyEvent* event) {
 
 	if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
 		if (isGameOver) {
+			resetSkinOptionsToDefault();
 			resetGameplay(false);
 			showStartScreen();
 		}
@@ -230,13 +232,13 @@ void Game::showStartScreen()
 
 	startGetReady = scene->addPixmap(QPixmap(":/assets/images/start-getready.png"));
 	if (startGetReady && !startGetReady->pixmap().isNull()) {
-		startGetReady->setPos((kViewWidth - startGetReady->pixmap().width()) / 2, 80);
+		startGetReady->setPos((kViewWidth - startGetReady->pixmap().width()) / 2, 60);
 		startGetReady->setZValue(3);
 	}
 
 	startGuide = scene->addPixmap(QPixmap(":/assets/images/start-guide.png"));
 	if (startGuide && !startGuide->pixmap().isNull()) {
-		startGuide->setPos((kViewWidth - startGuide->pixmap().width()) / 2, 190);
+		startGuide->setPos((kViewWidth - startGuide->pixmap().width()) / 2, 170);
 		startGuide->setZValue(3);
 	}
 
@@ -247,7 +249,7 @@ void Game::showStartScreen()
 			fallback.fill(Qt::darkYellow);
 			startGoButton->setPixmap(fallback);
 		}
-		startGoButton->setPos((kViewWidth - startGoButton->pixmap().width()) / 2, 330);
+		startGoButton->setPos((kViewWidth - startGoButton->pixmap().width()) / 2, 305);
 		startGoButton->setZValue(4);
 	}
 
@@ -298,14 +300,19 @@ void Game::buildSkinSelectors()
 		++index;
 	}
 
-	// 自定义上传按钮（放一张按钮图：assets/images/skin-custom.png）
+	// 自定义上传按钮
+    if (customSkinButton) {
+        scene->removeItem(customSkinButton);
+        delete customSkinButton;
+        customSkinButton = nullptr;
+    }	
 	QPixmap customPixmap = QPixmap(":/assets/images/skin-custom.png").scaled(50, 50, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	if (customPixmap.isNull()) {
 		customPixmap = QPixmap(50, 50);
 		customPixmap.fill(Qt::gray);
 	}
 	customSkinButton = scene->addPixmap(customPixmap);
-	customSkinButton->setPos(kBirdSelectorStartX + index * kBirdSelectorSpacing, kBirdSelectorY);
+	customSkinButton->setPos(kBirdSelectorStartX + 1 * kBirdSelectorSpacing, kBirdSelectorY + 70);
 	customSkinButton->setZValue(4);
 	customSkinButton->setData(0, "custom");
 }
@@ -340,9 +347,26 @@ void Game::uploadCustomSkin()
 	if (pix.isNull()) return;
 
 	QPixmap scaled = pix.scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-	skinOptions.append(scaled);
-	selectedSkinIndex = skinOptions.size() - 1;
-	bird->setSkin(scaled);
+
+    if (customSkinIndex < 0) {
+        customSkinIndex = skinOptions.size();
+        skinOptions.append(scaled);
+    } else {
+        skinOptions[customSkinIndex] = scaled;
+    }
+    selectedSkinIndex = customSkinIndex;
+    bird->setSkin(scaled);
 
 	buildSkinSelectors();
+}
+
+void Game::resetSkinOptionsToDefault()
+{
+    // 清空自定义，并回到默认选中
+    while (skinOptions.size() > 3) {
+        skinOptions.removeLast();
+    }
+    customSkinIndex = -1;
+    selectedSkinIndex = 0;
+    bird->useDefaultSkin();
 }

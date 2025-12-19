@@ -28,6 +28,7 @@ private:
 	void hideStartScreen();
 	void buildSkinSelectors();
 	void applySkinIndex(int index);
+	void resetSkinOptionsToDefault();
 	QGraphicsScene* scene;
 	QGraphicsTextItem* scoreText;
 	QGraphicsPixmapItem* gameOverBanner;
@@ -39,6 +40,7 @@ private:
 	QList<QGraphicsPixmapItem*> skinButtons;
 	QGraphicsPixmapItem* customSkinButton;
 	int selectedSkinIndex;
+	int customSkinIndex;
 	int score;
 	bool isGameOver;
 	bool startScreenVisible;

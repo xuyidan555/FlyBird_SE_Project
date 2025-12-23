@@ -3,7 +3,7 @@
 #include <QPainter>
 #include <QPainterPath>
 
-Bird::Bird() : velocity(0), gravity(0.5), lift(-10), customSkin(false) {
+Bird::Bird() : velocity(0), gravity(0.95), lift(-10), customSkin(false) {
 	defaultUp = QPixmap(":/assets/images/bluebird-upflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	defaultMid = QPixmap(":/assets/images/bluebird-midflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	defaultDown = QPixmap(":/assets/images/bluebird-downflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);

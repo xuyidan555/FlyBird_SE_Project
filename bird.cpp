@@ -3,12 +3,13 @@
 #include <QPainter>
 #include <QPainterPath>
 
-Bird::Bird() : velocity(0), gravity(0.95), lift(-10), customSkin(false) {
+Bird::Bird() : velocity(0), gravity(0.85), lift(-10), customSkin(false) {
 	defaultUp = QPixmap(":/assets/images/bluebird-upflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	defaultMid = QPixmap(":/assets/images/bluebird-midflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	defaultDown = QPixmap(":/assets/images/bluebird-downflap.png").scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	useDefaultSkin();
 	setPos(100, 300);
+	velocity = lift * 0.2; // give a slight upward glide when the round begins
 }
 
 void Bird::flap() {
@@ -37,6 +38,7 @@ void Bird::reset()
 {
 	setPixmap(skinMid);
 	setPos(100, 300);
+	velocity = lift * 0.2;
 }
 
 void Bird::setSkin(const QPixmap& pix)

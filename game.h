@@ -29,6 +29,7 @@ private:
 	void buildSkinSelectors();
 	void applySkinIndex(int index);
 	void resetSkinOptionsToDefault();
+	void updateCustomSkinPreview();
 	QGraphicsScene* scene;
 	QGraphicsTextItem* scoreText;
 	QGraphicsPixmapItem* gameOverBanner;
@@ -39,6 +40,7 @@ private:
 	QVector<QPixmap> skinOptions;
 	QList<QGraphicsPixmapItem*> skinButtons;
 	QGraphicsPixmapItem* customSkinButton;
+	QGraphicsPixmapItem* customSkinPreview;
 	int selectedSkinIndex;
 	int customSkinIndex;
 	int score;

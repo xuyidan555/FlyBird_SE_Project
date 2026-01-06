@@ -49,4 +49,7 @@ DISTFILES += \
     assets/images/bluebird-midflap.png \
     assets/images/bluebird-upflap.png \
     assets/images/gameover.png \
-    assets/images/pipe-green.png
+    assets/images/pipe-green.png \
+    flyBird.ico
+
+RC_ICONS = flyBird.ico

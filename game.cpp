@@ -1,11 +1,15 @@
 #include "game.h"
 #include <QBrush>
+#include <QDebug>
 #include <QFileDialog>
+#include <QGraphicsDropShadowEffect>
 #include <QGraphicsTextItem>
 #include <QIcon>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPainterPath>
 
 namespace {
 constexpr int kViewWidth = 400;
@@ -13,6 +17,54 @@ constexpr int kViewHeight = 600;
 constexpr int kBirdSelectorY = 430;
 constexpr int kBirdSelectorStartX = 90;
 constexpr int kBirdSelectorSpacing = 90;
+constexpr int kBaseSkinCount = 3;
+const QSize kSkinPixmapSize(40, 40);
+const QSize kCustomButtonPreviewSize(58, 58);
+
+QPixmap loadPixmapWithFallback(const QString& resourcePath) {
+	QPixmap pix(resourcePath);
+	if (!pix.isNull()) {
+		return pix;
+	}
+	QString fallbackPath = resourcePath;
+	if (fallbackPath.startsWith(":/")) {
+		fallbackPath = fallbackPath.mid(2);
+	}
+	QPixmap diskPixmap(fallbackPath);
+	if (!diskPixmap.isNull()) {
+		qWarning() << "Resource missing in qrc, loaded from disk:" << fallbackPath;
+		return diskPixmap;
+	}
+	qWarning() << "Failed to load pixmap from" << resourcePath;
+	return QPixmap();
+}
+
+QPixmap scaledSkinPixmap(const QString& resourcePath, const QPixmap& fallback) {
+	QPixmap pix = loadPixmapWithFallback(resourcePath);
+	if (pix.isNull()) {
+		return fallback;
+	}
+	return pix.scaled(kSkinPixmapSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+}
+
+QPixmap makeRoundedButtonPreview(const QPixmap& pix, const QSize& size = kCustomButtonPreviewSize) {
+	if (pix.isNull()) {
+		return QPixmap();
+	}
+	const QSize canvasSize = size.isEmpty() ? kCustomButtonPreviewSize : size;
+	QPixmap canvas(canvasSize);
+	canvas.fill(Qt::transparent);
+	QPixmap scaled = pix.scaled(canvasSize, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+	QPainter painter(&canvas);
+	painter.setRenderHint(QPainter::Antialiasing);
+	QPainterPath path;
+	path.addEllipse(canvas.rect());
+	painter.setClipPath(path);
+	const QPoint offset((canvas.width() - scaled.width()) / 2, (canvas.height() - scaled.height()) / 2);
+	painter.drawPixmap(offset, scaled);
+	painter.end();
+	return canvas;
+}
 }
 
 Game::Game(QWidget* parent)
@@ -28,11 +80,12 @@ Game::Game(QWidget* parent)
 	  startGuide(nullptr),
 	  startGoButton(nullptr),
 	  customSkinButton(nullptr),
+	  customSkinPreview(nullptr),
 	  customSkinIndex(-1) {
 	scene = new QGraphicsScene(this);
 	setScene(scene);
 
-	setWindowTitle("Ikun牌小鸟");
+	setWindowTitle("Hust牌小鸟");
 	setFixedSize(kViewWidth, kViewHeight);
 	scene->setSceneRect(0, 0, kViewWidth, kViewHeight);
 	scene->setBackgroundBrush(QBrush(QImage(":/assets/images/background-day.png").scaled(kViewWidth, kViewHeight)));
@@ -59,13 +112,16 @@ Game::Game(QWidget* parent)
 	scene->addItem(scoreText);
 
 	// 预置三种皮肤：默认 + 两个新鸟（放 assets/images/bird-yellow.png、bird-red.png）
-	const QPixmap base = QPixmap(":/assets/images/bluebird-midflap.png");
+	QPixmap basePixmap = loadPixmapWithFallback(":/assets/images/bluebird-midflap.png");
+	if (basePixmap.isNull()) {
+		basePixmap = QPixmap(kSkinPixmapSize);
+		basePixmap.fill(Qt::blue);
+	}
+	const QPixmap baseSkin = basePixmap.scaled(kSkinPixmapSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	auto scaledOrBase = [&](const QString& path) {
-		QPixmap p(path);
-		if (p.isNull()) return base.scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-		return p.scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+		return scaledSkinPixmap(path, baseSkin);
 	};
-	skinOptions.append(base.scaled(40, 40, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+	skinOptions.append(baseSkin);
 	skinOptions.append(scaledOrBase(":/assets/images/bird-yellow.png"));
 	skinOptions.append(scaledOrBase(":/assets/images/bird-red.png"));
 	bird->useDefaultSkin();
@@ -115,7 +171,12 @@ void Game::mousePressEvent(QMouseEvent* event)
 			}
 		}
 		if (customSkinButton && customSkinButton->contains(customSkinButton->mapFromScene(scenePos))) {
-			uploadCustomSkin();
+			if (customSkinIndex >= 0 && event->button() == Qt::LeftButton && !(event->modifiers() & Qt::ControlModifier)) {
+				applySkinIndex(customSkinIndex);
+			}
+			else {
+				uploadCustomSkin();
+			}
 			return;
 		}
 		return;
@@ -158,10 +219,15 @@ void Game::gameLoop() {
 			}
 			if (!restartHint) {
 				restartHint = new QGraphicsTextItem("按空格键重新开始\n回车返回开始界面");
-				restartHint->setDefaultTextColor(Qt::black);
-				restartHint->setFont(QFont("Arial", 12, QFont::Bold));
-				restartHint->setPos(this->width() / 2 - restartHint->boundingRect().width() / 2, this->height() / 2 + gameOverBanner->pixmap().height() / 2 + 10);
+				restartHint->setDefaultTextColor(QColor("#fef6d8"));
+				restartHint->setFont(QFont("Microsoft YaHei", 15, QFont::DemiBold));
+				restartHint->setPos(this->width() / 2 - restartHint->boundingRect().width() / 2, this->height() / 2 + gameOverBanner->pixmap().height() / 2 + 14);
 				restartHint->setZValue(1);
+				auto* shadow = new QGraphicsDropShadowEffect();
+				shadow->setBlurRadius(28);
+				shadow->setOffset(0, 4);
+				shadow->setColor(QColor(0, 0, 0, 180));
+				restartHint->setGraphicsEffect(shadow);
 				scene->addItem(restartHint);
 			}
 			isGameOver = true;
@@ -278,6 +344,11 @@ void Game::hideStartScreen()
 		delete customSkinButton;
 		customSkinButton = nullptr;
 	}
+	if (customSkinPreview) {
+		scene->removeItem(customSkinPreview);
+		delete customSkinPreview;
+		customSkinPreview = nullptr;
+	}
 }
 
 void Game::buildSkinSelectors()
@@ -287,9 +358,15 @@ void Game::buildSkinSelectors()
 		delete selector;
 	}
 	skinButtons.clear();
+	if (customSkinPreview) {
+		scene->removeItem(customSkinPreview);
+		delete customSkinPreview;
+		customSkinPreview = nullptr;
+	}
 
-	int index = 0;
-	for (const QPixmap& skin : skinOptions) {
+	const int displayCount = qMin(kBaseSkinCount, skinOptions.size());
+	for (int index = 0; index < displayCount; ++index) {
+		const QPixmap& skin = skinOptions[index];
 		QGraphicsPixmapItem* selector = scene->addPixmap(skin);
 		selector->setPos(kBirdSelectorStartX + index * kBirdSelectorSpacing, kBirdSelectorY);
 		selector->setZValue(4);
@@ -297,24 +374,48 @@ void Game::buildSkinSelectors()
 		selector->setData(1, index);
 		selector->setScale(index == selectedSkinIndex ? 1.2 : 1.0);
 		skinButtons.append(selector);
-		++index;
 	}
 
 	// 自定义上传按钮
-    if (customSkinButton) {
-        scene->removeItem(customSkinButton);
-        delete customSkinButton;
-        customSkinButton = nullptr;
-    }	
-	QPixmap customPixmap = QPixmap(":/assets/images/skin-custom.png").scaled(50, 50, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	if (customSkinButton) {
+		scene->removeItem(customSkinButton);
+		delete customSkinButton;
+		customSkinButton = nullptr;
+	}
+	QPixmap customPixmap = QPixmap(":/assets/images/skin-custom.png").scaled(58, 58, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	if (customPixmap.isNull()) {
-		customPixmap = QPixmap(50, 50);
+		customPixmap = QPixmap(kCustomButtonPreviewSize);
 		customPixmap.fill(Qt::gray);
 	}
 	customSkinButton = scene->addPixmap(customPixmap);
-	customSkinButton->setPos(kBirdSelectorStartX + 1 * kBirdSelectorSpacing, kBirdSelectorY + 70);
+	customSkinButton->setPos(kBirdSelectorStartX + 1 * kBirdSelectorSpacing, kBirdSelectorY + 68);
 	customSkinButton->setZValue(4);
 	customSkinButton->setData(0, "custom");
+	updateCustomSkinPreview();
+}
+
+void Game::updateCustomSkinPreview()
+{
+	if (customSkinPreview) {
+		scene->removeItem(customSkinPreview);
+		delete customSkinPreview;
+		customSkinPreview = nullptr;
+	}
+	if (!customSkinButton) {
+		return;
+	}
+	if (customSkinIndex < 0 || customSkinIndex >= skinOptions.size()) {
+		return;
+	}
+	QSize targetSize = customSkinButton->pixmap().isNull() ? kCustomButtonPreviewSize : customSkinButton->pixmap().size();
+	QPixmap preview = makeRoundedButtonPreview(skinOptions[customSkinIndex], targetSize);
+	if (preview.isNull()) {
+		return;
+	}
+	customSkinPreview = scene->addPixmap(preview);
+	customSkinPreview->setPos(customSkinButton->pos());
+	customSkinPreview->setZValue(customSkinButton->zValue() + 0.2);
+	customSkinPreview->setAcceptedMouseButtons(Qt::NoButton);
 }
 
 void Game::applySkinIndex(int index)
